@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"base-go/internal/models"
-	"base-go/internal/storage/array"
+	"base-go/internal/storage/slice"
 )
 
 // storage описывает интерфейс хранилища
@@ -22,7 +22,7 @@ type storage interface {
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	var arrayStorage storage = array.NewArrayStorage()
+	var arrayStorage storage = slice.NewArrayStorage()
 
 	for {
 		fmt.Print("Введите одну из команд - (list | size | save uuid | delete uuid | get uuid | clear | exit): ")
