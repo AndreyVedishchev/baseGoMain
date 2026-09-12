@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"base-go/internal/models"
-	"base-go/internal/storage/slice"
+	"base-go/internal/storage/mapp"
 )
 
 // storage описывает интерфейс хранилища
@@ -16,13 +16,13 @@ type storage interface {
 	Delete(uuid string)
 	Get(uuid string) *models.Resume
 	Size() int
-	GetAll() []*models.Resume
+	GetAll() map[string]*models.Resume
 	Clear()
 }
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	var arrayStorage storage = slice.NewArrayStorage()
+	var arrayStorage storage = mapp.NewArrayStorage()
 
 	for {
 		fmt.Print("Введите одну из команд - (list | size | save uuid | delete uuid | get uuid | clear | exit): ")
@@ -70,8 +70,8 @@ func printAll(arrayStorage storage) {
 	if len(all) == 0 {
 		fmt.Println("Empty")
 	} else {
-		for _, r := range all {
-			fmt.Println(r)
+		for k, r := range all {
+			fmt.Println("key:", k, "; value", r)
 		}
 	}
 	fmt.Println("----------------------------")
