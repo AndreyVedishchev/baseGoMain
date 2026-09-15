@@ -6,7 +6,7 @@ import (
 )
 
 // maxSize максимальный размер хранилища
-const maxSize = 0
+const maxSize = 5
 
 // ArrayStorage массив резюме
 type ArrayStorage struct {
@@ -33,8 +33,8 @@ func (as *ArrayStorage) Delete(uuid string) {
 // Get возвращает пустую модель, либо модель из хранилища (при наличии)
 func (as *ArrayStorage) Get(uuid string) *models.Resume {
 	fmt.Println("Вызов функции Get")
-	res := as.resumes[uuid]
-	if res != nil {
+	res, ok := as.resumes[uuid]
+	if ok {
 		return res
 	}
 	return &models.Resume{}
@@ -48,9 +48,15 @@ func (as *ArrayStorage) Size() int {
 }
 
 // GetAll возвращает набор ненулевых резюме
-func (as *ArrayStorage) GetAll() map[string]*models.Resume {
+func (as *ArrayStorage) GetAll() []*models.Resume {
 	fmt.Println("Вызов функции GetAll")
-	return as.resumes
+	resumes := make([]*models.Resume, 0)
+	for _, v := range as.resumes {
+		if v != nil {
+			resumes = append(resumes, v)
+		}
+	}
+	return resumes
 }
 
 // Clear удаляет все элементы из хранилища
