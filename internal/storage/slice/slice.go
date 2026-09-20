@@ -15,7 +15,7 @@ type ArrayStorage struct {
 
 // NewArrayStorage возвращает новый экземпляр хранилища
 func NewArrayStorage() *ArrayStorage {
-	return &ArrayStorage{resumes: make([]*models.Resume, maxSize)}
+	return &ArrayStorage{resumes: make([]*models.Resume, 0, maxSize)}
 }
 
 // Save сохраняет модель в хранилище
@@ -62,11 +62,11 @@ func (as *ArrayStorage) GetAll() []*models.Resume {
 			res = append(res, v)
 		}
 	}
-	return res
+	return as.resumes
 }
 
 // Clear удаляет все элементы из хранилища
 func (as *ArrayStorage) Clear() {
 	fmt.Println("Вызов функции Clear")
-	as.resumes = make([]*models.Resume, maxSize)
+	as.resumes = make([]*models.Resume, 0, maxSize)
 }

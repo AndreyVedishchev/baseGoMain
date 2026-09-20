@@ -16,7 +16,7 @@ type storage interface {
 	Delete(uuid string)
 	Get(uuid string) *models.Resume
 	Size() int
-	GetAll() map[string]*models.Resume
+	GetAll() []*models.Resume
 	Clear()
 }
 
@@ -70,8 +70,8 @@ func printAll(arrayStorage storage) {
 	if len(all) == 0 {
 		fmt.Println("Empty")
 	} else {
-		for k, r := range all {
-			fmt.Println("key:", k, "; value", r)
+		for _, r := range all {
+			fmt.Println(r)
 		}
 	}
 	fmt.Println("----------------------------")
