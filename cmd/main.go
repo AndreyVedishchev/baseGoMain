@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"base-go/internal/models"
-	"base-go/internal/storage/mapp"
+	"base-go/internal/storage/db"
 )
 
 // storage описывает интерфейс хранилища
@@ -22,7 +22,13 @@ type storage interface {
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	var arrayStorage storage = mapp.NewArrayStorage()
+	var arrayStorage storage = db.NewArrayStorage()
+
+	_, err := db.NewConnection()
+	if err != nil {
+		fmt.Println("не удалось подключиться к бд: %v", err)
+	}
+	defer db.CloseConnection()
 
 	for {
 		fmt.Print("Введите одну из команд - (list | size | save uuid | delete uuid | get uuid | clear | exit): ")
