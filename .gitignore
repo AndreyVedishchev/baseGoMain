@@ -1,6 +1,7 @@
 *.exe
 *.test
 *.prof
+app.log
 
 # IDE system files
 .idea

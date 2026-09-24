@@ -3,14 +3,15 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 
+	"base-go/internal/logger"
 	"base-go/internal/metrics"
 	"base-go/internal/models"
 	"base-go/internal/storage/db"
@@ -27,6 +28,10 @@ type storage interface {
 }
 
 func main() {
+	if err := logger.Init(); err != nil {
+		panic(err)
+	}
+	defer logger.Log.Sync()
 
 	go startMetricsServer()
 
@@ -35,7 +40,7 @@ func main() {
 
 	_, err := db.NewConnection()
 	if err != nil {
-		fmt.Println("не удалось подключиться к бд: %v", err)
+		logger.Log.Error("не удалось подключиться к БД", zap.Error(err))
 	}
 	defer db.CloseConnection()
 
@@ -96,7 +101,7 @@ func startMetricsServer() {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	if err := http.ListenAndServe(":2112", mux); err != nil {
-		log.Printf("ошибка сервера метрик: %v", err)
+		logger.Log.Error("ошибка сервера метрик", zap.Error(err))
 	}
 }
 

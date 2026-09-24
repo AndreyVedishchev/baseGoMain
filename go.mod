@@ -7,7 +7,12 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 )
 
-require github.com/lib/pq v1.10.9
+require (
+	github.com/lib/pq v1.10.9
+	go.uber.org/zap v1.28.0
+)
+
+require go.uber.org/multierr v1.10.0 // indirect
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

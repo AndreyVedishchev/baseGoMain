@@ -1,11 +1,12 @@
 package db
 
 import (
+	"base-go/internal/logger"
 	"base-go/internal/models"
-	"fmt"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"go.uber.org/zap"
 )
 
 var dbConnection *sqlx.DB
@@ -26,45 +27,45 @@ func NewConnection() (*sqlx.DB, error) {
 	var err error
 	dbConnection, err = sqlx.Connect("postgres", url)
 	if err != nil {
-		fmt.Println("Error connecting to database")
+		logger.Log.Error("ошибка подключения к базе данных", zap.Error(err))
 		return nil, err
 	}
-	fmt.Println("Successfully connected to database")
+	logger.Log.Info("успешное подключение к базе данных")
 	return dbConnection, nil
 }
 
 func CloseConnection() {
 	dbConnection.Close()
-	fmt.Println("Successfully closed connection to database")
+	logger.Log.Info("соединение с базой данных закрыто")
 }
 
 /////////////////////////////////////////////////////////////////////
 
 // Save сохраняет модель в хранилище
 func (as *ArrayStorage) Save(r *models.Resume) {
-	fmt.Println("Вызов функции Save")
+	logger.Log.Debug("вызов функции Save", zap.String("uuid", r.UUID))
 	_, err := dbConnection.NamedExec("INSERT INTO resumes (uuid) VALUES (:uuid)", r)
 	if err != nil {
-		fmt.Println("Ошибка при сохранении новой записи в БД", err)
+		logger.Log.Error("ошибка при сохранении новой записи в БД", zap.String("uuid", r.UUID), zap.Error(err))
 	}
 }
 
 // Delete удаляет элемент из хранилища (при наличии)
 func (as *ArrayStorage) Delete(uuid string) {
-	fmt.Println("Вызов функции Delete")
+	logger.Log.Debug("вызов функции Delete", zap.String("uuid", uuid))
 	_, err := dbConnection.Exec("delete from resumes where uuid = $1", uuid)
 	if err != nil {
-		fmt.Println("Ошибка при удалении записи по uuid из БД", err)
+		logger.Log.Error("ошибка при удалении записи по uuid из БД", zap.String("uuid", uuid), zap.Error(err))
 	}
 }
 
 // Get возвращает пустую модель, либо модель из хранилища (при наличии)
 func (as *ArrayStorage) Get(uuid string) *models.Resume {
-	fmt.Println("Вызов функции Get")
+	logger.Log.Debug("вызов функции Get", zap.String("uuid", uuid))
 	var resume models.Resume
 	err := dbConnection.Get(&resume, "select * from resumes where uuid=$1", uuid)
 	if err != nil {
-		fmt.Println("Ошибка поиска записи по uuid из БД", err)
+		logger.Log.Error("ошибка поиска записи по uuid из БД", zap.String("uuid", uuid), zap.Error(err))
 		return nil
 	}
 	return &resume
@@ -72,11 +73,11 @@ func (as *ArrayStorage) Get(uuid string) *models.Resume {
 
 // Size возвращает количество ненулевых элементов в хранилище
 func (as *ArrayStorage) Size() int {
-	fmt.Println("Вызов функции Size")
+	logger.Log.Debug("вызов функции Size")
 	var count int
 	err := dbConnection.Get(&count, "select count(*) cnt from resumes")
 	if err != nil {
-		fmt.Println("Ошибка при подсчете кол-ва записей в БД", err)
+		logger.Log.Error("ошибка при подсчете кол-ва записей в БД", zap.Error(err))
 		return 0
 	}
 	return count
@@ -84,11 +85,11 @@ func (as *ArrayStorage) Size() int {
 
 // GetAll возвращает набор ненулевых резюме
 func (as *ArrayStorage) GetAll() []*models.Resume {
-	fmt.Println("Вызов функции GetAll")
+	logger.Log.Debug("вызов функции GetAll")
 	var resumes []*models.Resume
 	err := dbConnection.Select(&resumes, "select * from resumes")
 	if err != nil {
-		fmt.Println("Ошибка при чтении всех записей из БД", err)
+		logger.Log.Error("ошибка при чтении всех записей из БД", zap.Error(err))
 		return nil
 	}
 	return resumes
@@ -96,9 +97,9 @@ func (as *ArrayStorage) GetAll() []*models.Resume {
 
 // Clear удаляет все элементы из хранилища
 func (as *ArrayStorage) Clear() {
-	fmt.Println("Вызов функции Clear")
+	logger.Log.Debug("вызов функции Clear")
 	_, err := dbConnection.Exec("delete from resumes")
 	if err != nil {
-		fmt.Println("Ошибка при очистке БД", err)
+		logger.Log.Error("ошибка при очистке БД", zap.Error(err))
 	}
 }
