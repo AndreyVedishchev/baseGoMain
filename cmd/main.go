@@ -3,9 +3,15 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"base-go/internal/metrics"
 	"base-go/internal/models"
 	"base-go/internal/storage/db"
 )
@@ -21,6 +27,9 @@ type storage interface {
 }
 
 func main() {
+
+	go startMetricsServer()
+
 	reader := bufio.NewReader(os.Stdin)
 	var arrayStorage storage = db.NewArrayStorage()
 
@@ -46,27 +55,48 @@ func main() {
 			uuid = parts[1]
 		}
 
-		switch parts[0] {
+		command := parts[0]
+		start := time.Now()
+		status := "ok"
+
+		switch command {
 		case "list":
 			printAll(arrayStorage)
 		case "size":
 			fmt.Println(arrayStorage.Size())
 		case "save":
 			arrayStorage.Save(&models.Resume{UUID: uuid})
+			metrics.StorageSize.Set(float64(arrayStorage.Size()))
 			printAll(arrayStorage)
 		case "delete":
 			arrayStorage.Delete(uuid)
+			metrics.StorageSize.Set(float64(arrayStorage.Size()))
 			printAll(arrayStorage)
 		case "get":
 			fmt.Println(arrayStorage.Get(uuid))
 		case "clear":
 			arrayStorage.Clear()
+			metrics.StorageSize.Set(float64(arrayStorage.Size()))
 			printAll(arrayStorage)
 		case "exit":
 			return
 		default:
+			status = "error"
 			fmt.Println("Неверная команда.")
 		}
+
+		metrics.CommandsTotal.WithLabelValues(command, status).Inc()
+		metrics.CommandDuration.WithLabelValues(command).Observe(time.Since(start).Seconds())
+	}
+}
+
+// метрики http://localhost:2112/metrics
+// дашборд http://localhost:9090/
+func startMetricsServer() {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	if err := http.ListenAndServe(":2112", mux); err != nil {
+		log.Printf("ошибка сервера метрик: %v", err)
 	}
 }
 
