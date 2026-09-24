@@ -12,3 +12,6 @@
 # Go workspace files
 go.work
 go.work.sum
+
+# local environment variables
+.env
