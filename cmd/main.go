@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
@@ -28,21 +29,26 @@ type storage interface {
 }
 
 func main() {
-	if err := logger.Init(); err != nil {
+	log, err := logger.Init()
+	if err != nil {
 		panic(err)
 	}
-	defer logger.Log.Sync()
+	defer log.Sync()
 
-	go startMetricsServer()
+	if err := godotenv.Load(); err != nil {
+		log.Warn("файл .env не найден")
+	}
+
+	m := metrics.NewMetrics()
+
+	go startMetricsServer(log)
 
 	reader := bufio.NewReader(os.Stdin)
-	var arrayStorage storage = db.NewArrayStorage()
-
-	_, err := db.NewConnection()
+	pgStorage, err := db.NewStorage(log)
 	if err != nil {
-		logger.Log.Error("не удалось подключиться к БД", zap.Error(err))
+		log.Error("не удалось подключиться к БД", zap.Error(err))
 	}
-	defer db.CloseConnection()
+	defer pgStorage.Close()
 
 	for {
 		fmt.Print("Введите одну из команд - (list | size | save uuid | delete uuid | get uuid | clear | exit): ")
@@ -66,23 +72,23 @@ func main() {
 
 		switch command {
 		case "list":
-			printAll(arrayStorage)
+			printAll(pgStorage)
 		case "size":
-			fmt.Println(arrayStorage.Size())
+			fmt.Println(pgStorage.Size())
 		case "save":
-			arrayStorage.Save(&models.Resume{UUID: uuid})
-			metrics.StorageSize.Set(float64(arrayStorage.Size()))
-			printAll(arrayStorage)
+			pgStorage.Save(&models.Resume{UUID: uuid})
+			m.StorageSize.Set(float64(pgStorage.Size()))
+			printAll(pgStorage)
 		case "delete":
-			arrayStorage.Delete(uuid)
-			metrics.StorageSize.Set(float64(arrayStorage.Size()))
-			printAll(arrayStorage)
+			pgStorage.Delete(uuid)
+			m.StorageSize.Set(float64(pgStorage.Size()))
+			printAll(pgStorage)
 		case "get":
-			fmt.Println(arrayStorage.Get(uuid))
+			fmt.Println(pgStorage.Get(uuid))
 		case "clear":
-			arrayStorage.Clear()
-			metrics.StorageSize.Set(float64(arrayStorage.Size()))
-			printAll(arrayStorage)
+			pgStorage.Clear()
+			m.StorageSize.Set(float64(pgStorage.Size()))
+			printAll(pgStorage)
 		case "exit":
 			return
 		default:
@@ -90,18 +96,18 @@ func main() {
 			fmt.Println("Неверная команда.")
 		}
 
-		metrics.CommandsTotal.WithLabelValues(command, status).Inc()
-		metrics.CommandDuration.WithLabelValues(command).Observe(time.Since(start).Seconds())
+		m.CommandsTotal.WithLabelValues(command, status).Inc()
+		m.CommandDuration.WithLabelValues(command).Observe(time.Since(start).Seconds())
 	}
 }
 
 // метрики http://localhost:2112/metrics
 // дашборд http://localhost:9090/
-func startMetricsServer() {
+func startMetricsServer(log *zap.Logger) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	if err := http.ListenAndServe(":2112", mux); err != nil {
-		logger.Log.Error("ошибка сервера метрик", zap.Error(err))
+		log.Error("ошибка сервера метрик", zap.Error(err))
 	}
 }
 
