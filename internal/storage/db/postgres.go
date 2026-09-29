@@ -1,10 +1,10 @@
 package db
 
 import (
-	"fmt"
-	"os"
+	"time"
 
 	"base-go/internal/models"
+	"base-go/internal/utils"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -27,29 +27,28 @@ func NewStorage(log *zap.Logger) (*Storage, error) {
 }
 
 func (as *Storage) connection() (*sqlx.DB, error) {
-	host := getEnv("POSTGRES_HOST", "localhost")
-	port := getEnv("POSTGRES_PORT", "5432")
-	user := getEnv("POSTGRES_USER", "postgres")
-	password := getEnv("POSTGRES_PASSWORD", "postgres")
-	dbname := getEnv("POSTGRES_DB", "base_go")
-
-	url := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, password, host, port, dbname)
+	url := utils.BuildPostgresURL()
+	maxRetries := utils.GetEnvInt("DB_MAX_RETRIES", 5)
+	retryDelay := utils.GetEnvDuration("DB_RETRY_DELAY", 2*time.Second)
 
 	var err error
-	as.dbConnection, err = sqlx.Connect("postgres", url)
-	if err != nil {
-		as.log.Error("ошибка подключения к базе данных", zap.Error(err))
-		return nil, err
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		as.dbConnection, err = sqlx.Connect("postgres", url)
+		if err == nil {
+			as.log.Info("успешное подключение к базе данных")
+			return as.dbConnection, nil
+		}
+		as.log.Warn("не удалось подключиться к базе данных, повтор попытки",
+			zap.Int("попытка", attempt),
+			zap.Int("всего попыток", maxRetries),
+			zap.Error(err))
+		if attempt < maxRetries {
+			time.Sleep(retryDelay)
+		}
 	}
-	as.log.Info("успешное подключение к базе данных")
-	return as.dbConnection, nil
-}
 
-func getEnv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
+	as.log.Error("ошибка подключения к базе данных после всех попыток", zap.Error(err))
+	return nil, err
 }
 
 func (as *Storage) Close() {

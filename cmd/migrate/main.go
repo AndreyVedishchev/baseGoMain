@@ -9,13 +9,20 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/joho/godotenv"
+
+	"base-go/internal/utils"
 )
 
 func main() {
 	direction := flag.String("direction", "up", "направление миграции: up | down")
 	flag.Parse()
 
-	url := "postgres://postgres:postgres@localhost:5432/base_go?sslmode=disable"
+	if err := godotenv.Load(); err != nil {
+		log.Println("файл .env не найден")
+	}
+
+	url := utils.BuildPostgresURL()
 
 	m, err := migrate.New("file://migrations", url)
 	if err != nil {
