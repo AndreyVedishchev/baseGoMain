@@ -6,14 +6,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	"base-go/internal/logger"
-	"base-go/internal/metrics"
 	"base-go/internal/models"
 	"base-go/internal/storage/db"
 )
@@ -38,8 +36,6 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Warn("файл .env не найден")
 	}
-
-	m := metrics.NewMetrics()
 
 	go startMetricsServer(log)
 
@@ -67,9 +63,6 @@ func main() {
 		}
 
 		command := parts[0]
-		start := time.Now()
-		status := "ok"
-
 		switch command {
 		case "list":
 			printAll(pgStorage)
@@ -77,27 +70,20 @@ func main() {
 			fmt.Println(pgStorage.Size())
 		case "save":
 			pgStorage.Save(&models.Resume{UUID: uuid})
-			m.StorageSize.Set(float64(pgStorage.Size()))
 			printAll(pgStorage)
 		case "delete":
 			pgStorage.Delete(uuid)
-			m.StorageSize.Set(float64(pgStorage.Size()))
 			printAll(pgStorage)
 		case "get":
 			fmt.Println(pgStorage.Get(uuid))
 		case "clear":
 			pgStorage.Clear()
-			m.StorageSize.Set(float64(pgStorage.Size()))
 			printAll(pgStorage)
 		case "exit":
 			return
 		default:
-			status = "error"
 			fmt.Println("Неверная команда.")
 		}
-
-		m.CommandsTotal.WithLabelValues(command, status).Inc()
-		m.CommandDuration.WithLabelValues(command).Observe(time.Since(start).Seconds())
 	}
 }
 
