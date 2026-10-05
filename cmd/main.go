@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
@@ -37,12 +38,12 @@ func main() {
 		log.Warn("файл .env не найден")
 	}
 
-	go startMetricsServer(log)
-
 	reader := bufio.NewReader(os.Stdin)
 	pgStorage, err := db.NewStorage(log)
 	if err != nil {
 		log.Error("не удалось подключиться к БД", zap.Error(err))
+	} else {
+		go startMetricsServer(log, pgStorage.Registry())
 	}
 	defer pgStorage.Close()
 
@@ -89,9 +90,9 @@ func main() {
 
 // метрики http://localhost:2112/metrics
 // дашборд http://localhost:9090/
-func startMetricsServer(log *zap.Logger) {
+func startMetricsServer(log *zap.Logger, reg *prometheus.Registry) {
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 	if err := http.ListenAndServe(":2112", mux); err != nil {
 		log.Error("ошибка сервера метрик", zap.Error(err))
 	}

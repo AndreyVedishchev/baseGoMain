@@ -8,24 +8,40 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
 type Storage struct {
-	dbConnection *sqlx.DB
-	log          *zap.Logger
+	dbConnection        *sqlx.DB
+	log                 *zap.Logger
+	registry            *prometheus.Registry
+	dbOperationsTotal   *prometheus.CounterVec
+	dbOperationDuration *prometheus.HistogramVec
 }
 
 func NewStorage(log *zap.Logger) (*Storage, error) {
-	initMetrics()
+	str := &Storage{
+		log:      log,
+		registry: prometheus.NewRegistry(),
+	}
+	str.dbOperationsTotal, str.dbOperationDuration = newMetrics(str.registry)
 
-	str := &Storage{}
-	str.log = log
 	_, err := str.connection()
 	if err != nil {
 		return nil, err
 	}
 	return str, nil
+}
+
+// Registry возвращает registry с метриками этого хранилища для экспонирования через HTTP. Для вызова в main startMetricsServer
+func (as *Storage) Registry() *prometheus.Registry {
+	return as.registry
+}
+
+func (as *Storage) recordMetrics(operation, status string, startTime time.Time) {
+	as.dbOperationDuration.WithLabelValues(operation).Observe(time.Since(startTime).Seconds())
+	as.dbOperationsTotal.WithLabelValues(operation, status).Inc()
 }
 
 func (as *Storage) connection() (*sqlx.DB, error) {
@@ -64,43 +80,44 @@ func (as *Storage) Close() {
 func (as *Storage) Save(r *models.Resume) {
 	as.log.Debug("вызов функции Save", zap.String("uuid", r.UUID))
 	start := time.Now()
-	_, err := as.dbConnection.NamedExec("INSERT INTO resumes (uuid) VALUES (:uuid)", r)
-	dbOperationDuration.WithLabelValues("save").Observe(time.Since(start).Seconds())
 	status := "ok"
+	defer func() { as.recordMetrics("save", status, start) }()
+
+	_, err := as.dbConnection.NamedExec("INSERT INTO resumes (uuid) VALUES (:uuid)", r)
 	if err != nil {
 		status = "error"
 		as.log.Error("ошибка при сохранении новой записи в БД", zap.String("uuid", r.UUID), zap.Error(err))
 	}
-	dbOperationsTotal.WithLabelValues("save", status).Inc()
 }
 
 // Delete удаляет элемент из хранилища (при наличии)
 func (as *Storage) Delete(uuid string) {
 	as.log.Debug("вызов функции Delete", zap.String("uuid", uuid))
 	start := time.Now()
-	_, err := as.dbConnection.Exec("delete from resumes where uuid = $1", uuid)
-	dbOperationDuration.WithLabelValues("delete").Observe(time.Since(start).Seconds())
 	status := "ok"
+	defer func() { as.recordMetrics("delete", status, start) }()
+
+	_, err := as.dbConnection.Exec("delete from resumes where uuid = $1", uuid)
 	if err != nil {
 		status = "error"
 		as.log.Error("ошибка при удалении записи по uuid из БД", zap.String("uuid", uuid), zap.Error(err))
 	}
-	dbOperationsTotal.WithLabelValues("delete", status).Inc()
 }
 
 // Get возвращает пустую модель, либо модель из хранилища (при наличии)
 func (as *Storage) Get(uuid string) *models.Resume {
 	as.log.Debug("вызов функции Get", zap.String("uuid", uuid))
 	start := time.Now()
+	status := "ok"
+	defer func() { as.recordMetrics("get", status, start) }()
+
 	var resume models.Resume
 	err := as.dbConnection.Get(&resume, "select uuid from resumes where uuid=$1", uuid)
-	dbOperationDuration.WithLabelValues("get").Observe(time.Since(start).Seconds())
 	if err != nil {
-		dbOperationsTotal.WithLabelValues("get", "error").Inc()
+		status = "error"
 		as.log.Error("ошибка поиска записи по uuid из БД", zap.String("uuid", uuid), zap.Error(err))
 		return nil
 	}
-	dbOperationsTotal.WithLabelValues("get", "ok").Inc()
 	return &resume
 }
 
@@ -108,15 +125,16 @@ func (as *Storage) Get(uuid string) *models.Resume {
 func (as *Storage) Size() int {
 	as.log.Debug("вызов функции Size")
 	start := time.Now()
+	status := "ok"
+	defer func() { as.recordMetrics("size", status, start) }()
+
 	var count int
 	err := as.dbConnection.Get(&count, "select count(uuid) cnt from resumes")
-	dbOperationDuration.WithLabelValues("size").Observe(time.Since(start).Seconds())
 	if err != nil {
-		dbOperationsTotal.WithLabelValues("size", "error").Inc()
+		status = "error"
 		as.log.Error("ошибка при подсчете кол-ва записей в БД", zap.Error(err))
 		return 0
 	}
-	dbOperationsTotal.WithLabelValues("size", "ok").Inc()
 	return count
 }
 
@@ -124,15 +142,16 @@ func (as *Storage) Size() int {
 func (as *Storage) GetAll() []*models.Resume {
 	as.log.Debug("вызов функции GetAll")
 	start := time.Now()
+	status := "ok"
+	defer func() { as.recordMetrics("get_all", status, start) }()
+
 	var resumes []*models.Resume
 	err := as.dbConnection.Select(&resumes, "select uuid from resumes")
-	dbOperationDuration.WithLabelValues("get_all").Observe(time.Since(start).Seconds())
 	if err != nil {
-		dbOperationsTotal.WithLabelValues("get_all", "error").Inc()
+		status = "error"
 		as.log.Error("ошибка при чтении всех записей из БД", zap.Error(err))
 		return nil
 	}
-	dbOperationsTotal.WithLabelValues("get_all", "ok").Inc()
 	return resumes
 }
 
@@ -140,12 +159,12 @@ func (as *Storage) GetAll() []*models.Resume {
 func (as *Storage) Clear() {
 	as.log.Debug("вызов функции Clear")
 	start := time.Now()
-	_, err := as.dbConnection.Exec("delete from resumes")
-	dbOperationDuration.WithLabelValues("clear").Observe(time.Since(start).Seconds())
 	status := "ok"
+	defer func() { as.recordMetrics("clear", status, start) }()
+
+	_, err := as.dbConnection.Exec("delete from resumes")
 	if err != nil {
 		status = "error"
 		as.log.Error("ошибка при очистке БД", zap.Error(err))
 	}
-	dbOperationsTotal.WithLabelValues("clear", status).Inc()
 }
