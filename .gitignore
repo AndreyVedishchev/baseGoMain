@@ -1,6 +1,7 @@
 *.exe
 *.test
 *.prof
+app.log
 
 # IDE system files
 .idea
@@ -12,3 +13,6 @@
 # Go workspace files
 go.work
 go.work.sum
+
+# local environment variables
+.env
