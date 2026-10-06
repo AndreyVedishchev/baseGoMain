@@ -83,7 +83,10 @@ func (as *Storage) Save(r *models.Resume) {
 	status := "ok"
 	defer func() { as.recordMetrics("save", status, start) }()
 
-	_, err := as.dbConnection.NamedExec("INSERT INTO resumes (uuid) VALUES (:uuid)", r)
+	_, err := as.dbConnection.NamedExec(`
+		INSERT INTO resumes (uuid, fio, birthdate, sex, city, telephon, citizenship, position, salary, experience)
+		VALUES (:uuid, :fio, :birthdate, :sex, :city, :telephon, :citizenship, :position, :salary, :experience)
+	`, r)
 	if err != nil {
 		status = "error"
 		as.log.Error("ошибка при сохранении новой записи в БД", zap.String("uuid", r.UUID), zap.Error(err))
@@ -112,7 +115,10 @@ func (as *Storage) Get(uuid string) *models.Resume {
 	defer func() { as.recordMetrics("get", status, start) }()
 
 	var resume models.Resume
-	err := as.dbConnection.Get(&resume, "select uuid from resumes where uuid=$1", uuid)
+	err := as.dbConnection.Get(&resume, `
+		select uuid, fio, birthdate, sex, city, telephon, citizenship, position, salary, experience
+		from resumes where uuid=$1
+	`, uuid)
 	if err != nil {
 		status = "error"
 		as.log.Error("ошибка поиска записи по uuid из БД", zap.String("uuid", uuid), zap.Error(err))
@@ -146,7 +152,10 @@ func (as *Storage) GetAll() []*models.Resume {
 	defer func() { as.recordMetrics("get_all", status, start) }()
 
 	var resumes []*models.Resume
-	err := as.dbConnection.Select(&resumes, "select uuid from resumes")
+	err := as.dbConnection.Select(&resumes, `
+		select uuid, fio, birthdate, sex, city, telephon, citizenship, position, salary, experience
+		from resumes
+	`)
 	if err != nil {
 		status = "error"
 		as.log.Error("ошибка при чтении всех записей из БД", zap.Error(err))
