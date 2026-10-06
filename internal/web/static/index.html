@@ -6,26 +6,39 @@
 <title>Resumes storage</title>
 <style>
   :root { color-scheme: light dark; }
-  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+  body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 40px auto; padding: 0 16px; }
   h1 { font-size: 1.4rem; }
   section { border: 1px solid #8884; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
   h2 { margin-top: 0; font-size: 1.05rem; }
   input { padding: 6px 8px; font-size: 1rem; }
   button { padding: 6px 12px; font-size: 1rem; cursor: pointer; margin-left: 6px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #8884; }
+  .table-wrap { overflow-x: auto; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #8884; white-space: nowrap; }
   td button { margin-left: 0; }
   .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   #status { min-height: 1.2em; font-size: 0.9rem; }
   .error { color: #d33; }
   .ok { color: #2a8f2a; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #8884; }
+  .tab-btn { padding: 8px 14px; font-size: 1rem; cursor: pointer; margin-left: 0; border: none; background: none; border-bottom: 2px solid transparent; }
+  .tab-btn.active { border-bottom-color: currentColor; font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 </style>
 </head>
 <body>
   <h1>Resumes storage — веб-интерфейс</h1>
   <div id="status"></div>
 
-  <section>
+  <div class="tabs">
+    <button class="tab-btn" data-tab="tab-save" onclick="showTab('tab-save')">Добавить</button>
+    <button class="tab-btn" data-tab="tab-get" onclick="showTab('tab-get')">Найти</button>
+    <button class="tab-btn" data-tab="tab-delete" onclick="showTab('tab-delete')">Удалить</button>
+    <button class="tab-btn" data-tab="tab-list" onclick="showTab('tab-list')">Список и размер</button>
+  </div>
+
+  <section id="tab-save" class="tab-panel">
     <h2>Добавить (Save)</h2>
     <div class="row">
       <input id="saveUuid" placeholder="uuid">
@@ -42,7 +55,7 @@
     </div>
   </section>
 
-  <section>
+  <section id="tab-get" class="tab-panel">
     <h2>Найти по UUID (Get)</h2>
     <div class="row">
       <input id="getUuid" placeholder="uuid">
@@ -51,32 +64,39 @@
     <div id="getResult"></div>
   </section>
 
-  <section>
+  <section id="tab-delete" class="tab-panel">
     <h2>Удалить по UUID (Delete)</h2>
     <div class="row">
       <input id="deleteUuid" placeholder="uuid">
       <button onclick="deleteResume()">Delete</button>
+      <button onclick="clearAll()">Clear (удалить всё)</button>
     </div>
   </section>
 
-  <section>
+  <section id="tab-list" class="tab-panel">
     <h2>Список и размер (GetAll / Size)</h2>
     <div class="row">
       <button onclick="refreshList()">Обновить список</button>
-      <button onclick="clearAll()">Clear (удалить всё)</button>
       <span id="sizeLabel"></span>
     </div>
-    <table id="resumeTable">
-      <thead><tr>
-        <th>UUID</th><th>ФИО</th><th>Дата рожд.</th><th>Пол</th><th>Город</th>
-        <th>Телефон</th><th>Гражданство</th><th>Должность</th><th>Зарплата</th><th>Опыт</th><th></th>
-      </tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-wrap">
+      <table id="resumeTable">
+        <thead><tr>
+          <th>UUID</th><th>ФИО</th><th>Дата рожд.</th><th>Пол</th><th>Город</th>
+          <th>Телефон</th><th>Гражданство</th><th>Должность</th><th>Зарплата</th><th>Опыт</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
 <script>
 const statusEl = document.getElementById('status');
+
+function showTab(tabId) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.toggle('active', el.id === tabId));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.toggle('active', el.dataset.tab === tabId));
+}
 
 function showStatus(message, isError) {
   statusEl.textContent = message;
@@ -140,12 +160,6 @@ async function refreshList() {
         td.textContent = v;
         tr.appendChild(td);
       }
-      const tdActions = document.createElement('td');
-      const btn = document.createElement('button');
-      btn.textContent = 'Delete';
-      btn.onclick = () => { document.getElementById('deleteUuid').value = r.UUID; deleteResume(); };
-      tdActions.appendChild(btn);
-      tr.appendChild(tdActions);
       tbody.appendChild(tr);
     }
     document.getElementById('sizeLabel').textContent = 'Size: ' + sizeInfo.size;
@@ -233,6 +247,7 @@ async function clearAll() {
   }
 }
 
+showTab('tab-list');
 refreshList();
 </script>
 </body>
