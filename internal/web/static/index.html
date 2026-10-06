@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resumes storage</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 1.4rem; }
+  section { border: 1px solid #8884; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+  h2 { margin-top: 0; font-size: 1.05rem; }
+  input { padding: 6px 8px; font-size: 1rem; }
+  button { padding: 6px 12px; font-size: 1rem; cursor: pointer; margin-left: 6px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #8884; }
+  td button { margin-left: 0; }
+  .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #status { min-height: 1.2em; font-size: 0.9rem; }
+  .error { color: #d33; }
+  .ok { color: #2a8f2a; }
+</style>
+</head>
+<body>
+  <h1>Resumes storage — веб-интерфейс</h1>
+  <div id="status"></div>
+
+  <section>
+    <h2>Добавить (Save)</h2>
+    <div class="row">
+      <input id="saveUuid" placeholder="uuid">
+      <button onclick="saveResume()">Save</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Найти по UUID (Get)</h2>
+    <div class="row">
+      <input id="getUuid" placeholder="uuid">
+      <button onclick="getResume()">Get</button>
+    </div>
+    <div id="getResult"></div>
+  </section>
+
+  <section>
+    <h2>Удалить по UUID (Delete)</h2>
+    <div class="row">
+      <input id="deleteUuid" placeholder="uuid">
+      <button onclick="deleteResume()">Delete</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Список и размер (GetAll / Size)</h2>
+    <div class="row">
+      <button onclick="refreshList()">Обновить список</button>
+      <button onclick="clearAll()">Clear (удалить всё)</button>
+      <span id="sizeLabel"></span>
+    </div>
+    <table id="resumeTable">
+      <thead><tr><th>UUID</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+<script>
+const statusEl = document.getElementById('status');
+
+function showStatus(message, isError) {
+  statusEl.textContent = message;
+  statusEl.className = isError ? 'error' : 'ok';
+}
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  let body = null;
+  const text = await res.text();
+  if (text) {
+    try { body = JSON.parse(text); } catch (e) { body = text; }
+  }
+  if (!res.ok) {
+    const message = (body && body.error) ? body.error : ('HTTP ' + res.status);
+    throw new Error(message);
+  }
+  return body;
+}
+
+async function refreshList() {
+  try {
+    const [resumes, sizeInfo] = await Promise.all([
+      api('/api/resumes'),
+      api('/api/resumes/size'),
+    ]);
+    const tbody = document.querySelector('#resumeTable tbody');
+    tbody.innerHTML = '';
+    for (const r of resumes) {
+      const tr = document.createElement('tr');
+      const tdUuid = document.createElement('td');
+      tdUuid.textContent = r.UUID;
+      const tdActions = document.createElement('td');
+      const btn = document.createElement('button');
+      btn.textContent = 'Delete';
+      btn.onclick = () => { document.getElementById('deleteUuid').value = r.UUID; deleteResume(); };
+      tdActions.appendChild(btn);
+      tr.appendChild(tdUuid);
+      tr.appendChild(tdActions);
+      tbody.appendChild(tr);
+    }
+    document.getElementById('sizeLabel').textContent = 'Size: ' + sizeInfo.size;
+  } catch (e) {
+    showStatus('Ошибка обновления списка: ' + e.message, true);
+  }
+}
+
+async function saveResume() {
+  const uuid = document.getElementById('saveUuid').value.trim();
+  if (!uuid) { showStatus('Введите uuid для сохранения', true); return; }
+  try {
+    await api('/api/resumes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ UUID: uuid }),
+    });
+    showStatus('Сохранено: ' + uuid, false);
+    document.getElementById('saveUuid').value = '';
+    refreshList();
+  } catch (e) {
+    showStatus('Ошибка сохранения: ' + e.message, true);
+  }
+}
+
+async function getResume() {
+  const uuid = document.getElementById('getUuid').value.trim();
+  const resultEl = document.getElementById('getResult');
+  if (!uuid) { showStatus('Введите uuid для поиска', true); return; }
+  try {
+    const resume = await api('/api/resumes/' + encodeURIComponent(uuid));
+    resultEl.textContent = 'Найдено: ' + JSON.stringify(resume);
+    showStatus('', false);
+  } catch (e) {
+    resultEl.textContent = '';
+    showStatus('Ошибка поиска: ' + e.message, true);
+  }
+}
+
+async function deleteResume() {
+  const uuid = document.getElementById('deleteUuid').value.trim();
+  if (!uuid) { showStatus('Введите uuid для удаления', true); return; }
+  try {
+    await api('/api/resumes/' + encodeURIComponent(uuid), { method: 'DELETE' });
+    showStatus('Удалено: ' + uuid, false);
+    document.getElementById('deleteUuid').value = '';
+    refreshList();
+  } catch (e) {
+    showStatus('Ошибка удаления: ' + e.message, true);
+  }
+}
+
+async function clearAll() {
+  if (!confirm('Удалить все резюме из хранилища?')) return;
+  try {
+    await api('/api/resumes', { method: 'DELETE' });
+    showStatus('Хранилище очищено', false);
+    refreshList();
+  } catch (e) {
+    showStatus('Ошибка очистки: ' + e.message, true);
+  }
+}
+
+refreshList();
+</script>
+</body>
+</html>

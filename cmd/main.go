@@ -14,18 +14,10 @@ import (
 
 	"base-go/internal/logger"
 	"base-go/internal/models"
+	"base-go/internal/storage"
 	"base-go/internal/storage/db"
+	"base-go/internal/web"
 )
-
-// storage описывает интерфейс хранилища
-type storage interface {
-	Save(r *models.Resume)
-	Delete(uuid string)
-	Get(uuid string) *models.Resume
-	Size() int
-	GetAll() []*models.Resume
-	Clear()
-}
 
 func main() {
 	log, err := logger.Init()
@@ -46,6 +38,13 @@ func main() {
 		go startMetricsServer(log, pgStorage.Registry())
 	}
 	defer pgStorage.Close()
+
+	webServer := web.NewServer(pgStorage, log)
+	go func() {
+		if err := webServer.ListenAndServe(":8080"); err != nil {
+			log.Error("ошибка веб-сервера", zap.Error(err))
+		}
+	}()
 
 	for {
 		fmt.Print("Введите одну из команд - (list | size | save uuid | delete uuid | get uuid | clear | exit): ")
@@ -98,7 +97,7 @@ func startMetricsServer(log *zap.Logger, reg *prometheus.Registry) {
 	}
 }
 
-func printAll(arrayStorage storage) {
+func printAll(arrayStorage storage.Storage) {
 	all := arrayStorage.GetAll()
 	fmt.Println("----------------------------")
 	if len(all) == 0 {
