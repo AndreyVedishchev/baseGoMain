@@ -43,7 +43,11 @@ func main() {
 	kafkaProducer := kafka.NewProducer(log)
 	defer kafkaProducer.Close()
 
-	webServer := web.NewServer(pgStorage, kafkaProducer, log)
+	kafkaConsumer := kafka.NewConsumer(log)
+	go kafkaConsumer.Run()
+	defer kafkaConsumer.Close()
+
+	webServer := web.NewServer(pgStorage, kafkaProducer, kafkaConsumer, log)
 	go func() {
 		if err := webServer.ListenAndServe(":8080"); err != nil {
 			log.Error("ошибка веб-сервера", zap.Error(err))

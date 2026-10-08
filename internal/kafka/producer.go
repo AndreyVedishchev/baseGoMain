@@ -21,15 +21,11 @@ type Producer struct {
 // NewProducer создаёт продюсер, настроенный через переменные окружения KAFKA_BROKERS / KAFKA_TOPIC
 func NewProducer(log *zap.Logger) *Producer {
 	writer := &kafka.Writer{
-		Addr:  kafka.TCP(utils.BuildKafkaBrokers()...),
-		Topic: utils.KafkaTopic(),
-		// без явного Balancer партиция выбиралась бы round-robin'ом и ключ (uuid)
-		// на неё бы не влиял — тогда порядок сообщений по одному резюме не гарантирован
-		Balancer: &kafka.Hash{},
-		// в dev-окружении topic может быть ещё не создан — позволяем брокеру создать его на лету
-		AllowAutoTopicCreation: true,
-		// защита на уровне Writer, если брокер не отвечает; независима от ctx, переданного в Publish
-		WriteTimeout: 5 * time.Second,
+		Addr:                   kafka.TCP(utils.BuildKafkaBrokers()...),
+		Topic:                  utils.KafkaTopic(),
+		Balancer:               &kafka.Hash{},
+		AllowAutoTopicCreation: true, // в dev-окружении topic может быть ещё не создан — позволяем брокеру создать его на лету
+		WriteTimeout:           5 * time.Second,
 	}
 	return &Producer{writer: writer, log: log}
 }
@@ -47,8 +43,6 @@ func (p *Producer) Publish(resume *models.Resume) error {
 		Value: value,
 	}
 
-	// WriteMessages блокируется до подтверждения от брокера; context.Background() — без
-	// отмены и дедлайна извне, таймаут ожидания задаёт только WriteTimeout у Writer
 	if err := p.writer.WriteMessages(context.Background(), msg); err != nil {
 		p.log.Error("ошибка публикации сообщения в Kafka", zap.String("uuid", resume.UUID), zap.Error(err))
 		return err

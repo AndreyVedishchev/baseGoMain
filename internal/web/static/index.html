@@ -36,6 +36,7 @@
     <button class="tab-btn" data-tab="tab-get" onclick="showTab('tab-get')">Найти</button>
     <button class="tab-btn" data-tab="tab-delete" onclick="showTab('tab-delete')">Удалить</button>
     <button class="tab-btn" data-tab="tab-list" onclick="showTab('tab-list')">Список и размер</button>
+    <button class="tab-btn" data-tab="tab-views" onclick="showTab('tab-views')">Таблица просмотров</button>
   </div>
 
   <section id="tab-save" class="tab-panel">
@@ -85,6 +86,19 @@
           <th>UUID</th><th>ФИО</th><th>Дата рожд.</th><th>Пол</th><th>Город</th>
           <th>Телефон</th><th>Гражданство</th><th>Должность</th><th>Зарплата</th><th>Опыт</th>
         </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-views" class="tab-panel">
+    <h2>Таблица просмотров</h2>
+    <div class="row">
+      <button onclick="refreshViews()">Обновить</button>
+    </div>
+    <div class="table-wrap">
+      <table id="viewsTable">
+        <thead><tr><th>UUID резюме</th><th>Кол-во запросов</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -165,6 +179,25 @@ async function refreshList() {
     document.getElementById('sizeLabel').textContent = 'Size: ' + sizeInfo.size;
   } catch (e) {
     showStatus('Ошибка обновления списка: ' + e.message, true);
+  }
+}
+
+async function refreshViews() {
+  try {
+    const counts = await api('/api/resumes/views');
+    const tbody = document.querySelector('#viewsTable tbody');
+    tbody.innerHTML = '';
+    for (const c of counts) {
+      const tr = document.createElement('tr');
+      for (const v of [c.UUID, c.Count]) {
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+  } catch (e) {
+    showStatus('Ошибка обновления таблицы просмотров: ' + e.message, true);
   }
 }
 
