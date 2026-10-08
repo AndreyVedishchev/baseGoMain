@@ -8,12 +8,15 @@ require (
 )
 
 require (
+	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
+	github.com/segmentio/kafka-go v0.4.51
 	go.uber.org/zap v1.28.0
 )
 
 require (
-	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
+	github.com/pierrec/lz4/v4 v4.1.16 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 )
 

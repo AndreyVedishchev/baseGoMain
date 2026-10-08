@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -44,4 +45,14 @@ func BuildPostgresURL() string {
 	dbname := GetEnv("POSTGRES_DB", "base_go")
 
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, password, host, port, dbname)
+}
+
+// BuildKafkaBrokers возвращает список адресов брокеров Kafka, брокеров может быть несколько
+func BuildKafkaBrokers() []string {
+	return strings.Split(GetEnv("KAFKA_BROKERS", "localhost:9092"), ",")
+}
+
+// KafkaTopic возвращает имя topic
+func KafkaTopic() string {
+	return GetEnv("KAFKA_TOPIC", "resume-views")
 }
