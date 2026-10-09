@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
+	"base-go/internal/kafka"
 	"base-go/internal/logger"
 	"base-go/internal/models"
 	"base-go/internal/storage"
@@ -39,7 +40,14 @@ func main() {
 	}
 	defer pgStorage.Close()
 
-	webServer := web.NewServer(pgStorage, log)
+	kafkaProducer := kafka.NewProducer(log)
+	defer kafkaProducer.Close()
+
+	kafkaConsumer := kafka.NewConsumer(log)
+	go kafkaConsumer.Run()
+	defer kafkaConsumer.Close()
+
+	webServer := web.NewServer(pgStorage, kafkaProducer, kafkaConsumer, log)
 	go func() {
 		if err := webServer.ListenAndServe(":8080"); err != nil {
 			log.Error("ошибка веб-сервера", zap.Error(err))

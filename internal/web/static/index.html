@@ -6,34 +6,57 @@
 <title>Resumes storage</title>
 <style>
   :root { color-scheme: light dark; }
-  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+  body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 40px auto; padding: 0 16px; }
   h1 { font-size: 1.4rem; }
   section { border: 1px solid #8884; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
   h2 { margin-top: 0; font-size: 1.05rem; }
   input { padding: 6px 8px; font-size: 1rem; }
   button { padding: 6px 12px; font-size: 1rem; cursor: pointer; margin-left: 6px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #8884; }
+  .table-wrap { overflow-x: auto; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #8884; white-space: nowrap; }
   td button { margin-left: 0; }
   .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   #status { min-height: 1.2em; font-size: 0.9rem; }
   .error { color: #d33; }
   .ok { color: #2a8f2a; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #8884; }
+  .tab-btn { padding: 8px 14px; font-size: 1rem; cursor: pointer; margin-left: 0; border: none; background: none; border-bottom: 2px solid transparent; }
+  .tab-btn.active { border-bottom-color: currentColor; font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 </style>
 </head>
 <body>
   <h1>Resumes storage — веб-интерфейс</h1>
   <div id="status"></div>
 
-  <section>
+  <div class="tabs">
+    <button class="tab-btn" data-tab="tab-save" onclick="showTab('tab-save')">Добавить</button>
+    <button class="tab-btn" data-tab="tab-get" onclick="showTab('tab-get')">Найти</button>
+    <button class="tab-btn" data-tab="tab-delete" onclick="showTab('tab-delete')">Удалить</button>
+    <button class="tab-btn" data-tab="tab-list" onclick="showTab('tab-list')">Список и размер</button>
+    <button class="tab-btn" data-tab="tab-views" onclick="showTab('tab-views')">Таблица просмотров</button>
+  </div>
+
+  <section id="tab-save" class="tab-panel">
     <h2>Добавить (Save)</h2>
     <div class="row">
       <input id="saveUuid" placeholder="uuid">
+      <input id="saveFio" placeholder="ФИО">
+      <input id="saveBirthdate" type="date" placeholder="дата рождения">
+      <input id="saveSex" placeholder="пол">
+      <input id="saveCity" placeholder="город">
+      <input id="saveTelephon" placeholder="телефон">
+      <input id="saveCitizenship" placeholder="гражданство">
+      <input id="savePosition" placeholder="должность">
+      <input id="saveSalary" type="number" placeholder="зарплата">
+      <input id="saveExperience" type="number" placeholder="опыт (лет)">
       <button onclick="saveResume()">Save</button>
     </div>
   </section>
 
-  <section>
+  <section id="tab-get" class="tab-panel">
     <h2>Найти по UUID (Get)</h2>
     <div class="row">
       <input id="getUuid" placeholder="uuid">
@@ -42,29 +65,52 @@
     <div id="getResult"></div>
   </section>
 
-  <section>
+  <section id="tab-delete" class="tab-panel">
     <h2>Удалить по UUID (Delete)</h2>
     <div class="row">
       <input id="deleteUuid" placeholder="uuid">
       <button onclick="deleteResume()">Delete</button>
+      <button onclick="clearAll()">Clear (удалить всё)</button>
     </div>
   </section>
 
-  <section>
+  <section id="tab-list" class="tab-panel">
     <h2>Список и размер (GetAll / Size)</h2>
     <div class="row">
       <button onclick="refreshList()">Обновить список</button>
-      <button onclick="clearAll()">Clear (удалить всё)</button>
       <span id="sizeLabel"></span>
     </div>
-    <table id="resumeTable">
-      <thead><tr><th>UUID</th><th></th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-wrap">
+      <table id="resumeTable">
+        <thead><tr>
+          <th>UUID</th><th>ФИО</th><th>Дата рожд.</th><th>Пол</th><th>Город</th>
+          <th>Телефон</th><th>Гражданство</th><th>Должность</th><th>Зарплата</th><th>Опыт</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-views" class="tab-panel">
+    <h2>Таблица просмотров</h2>
+    <div class="row">
+      <button onclick="refreshViews()">Обновить</button>
+    </div>
+    <div class="table-wrap">
+      <table id="viewsTable">
+        <thead><tr><th>UUID резюме</th><th>Кол-во запросов</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
 <script>
 const statusEl = document.getElementById('status');
+
+function showTab(tabId) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.toggle('active', el.id === tabId));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.toggle('active', el.dataset.tab === tabId));
+}
 
 function showStatus(message, isError) {
   statusEl.textContent = message;
@@ -85,6 +131,29 @@ async function api(path, options) {
   return body;
 }
 
+function fieldOrNull(id) {
+  const value = document.getElementById(id).value.trim();
+  return value === '' ? null : value;
+}
+
+function dateFieldOrNull(id) {
+  const value = document.getElementById(id).value.trim();
+  return value === '' ? null : value + 'T00:00:00Z';
+}
+
+function numberFieldOrNull(id) {
+  const value = document.getElementById(id).value.trim();
+  return value === '' ? null : Number(value);
+}
+
+function formatDate(value) {
+  return value ? String(value).slice(0, 10) : '';
+}
+
+function cellText(value) {
+  return value === null || value === undefined ? '' : String(value);
+}
+
 async function refreshList() {
   try {
     const [resumes, sizeInfo] = await Promise.all([
@@ -95,20 +164,40 @@ async function refreshList() {
     tbody.innerHTML = '';
     for (const r of resumes) {
       const tr = document.createElement('tr');
-      const tdUuid = document.createElement('td');
-      tdUuid.textContent = r.UUID;
-      const tdActions = document.createElement('td');
-      const btn = document.createElement('button');
-      btn.textContent = 'Delete';
-      btn.onclick = () => { document.getElementById('deleteUuid').value = r.UUID; deleteResume(); };
-      tdActions.appendChild(btn);
-      tr.appendChild(tdUuid);
-      tr.appendChild(tdActions);
+      const values = [
+        r.UUID, cellText(r.Fio), formatDate(r.Birthdate), cellText(r.Sex), cellText(r.City),
+        cellText(r.Telephon), cellText(r.Citizenship), cellText(r.Position),
+        cellText(r.Salary), cellText(r.Experience),
+      ];
+      for (const v of values) {
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      }
       tbody.appendChild(tr);
     }
     document.getElementById('sizeLabel').textContent = 'Size: ' + sizeInfo.size;
   } catch (e) {
     showStatus('Ошибка обновления списка: ' + e.message, true);
+  }
+}
+
+async function refreshViews() {
+  try {
+    const counts = await api('/api/resumes/views');
+    const tbody = document.querySelector('#viewsTable tbody');
+    tbody.innerHTML = '';
+    for (const c of counts) {
+      const tr = document.createElement('tr');
+      for (const v of [c.UUID, c.Count]) {
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+  } catch (e) {
+    showStatus('Ошибка обновления таблицы просмотров: ' + e.message, true);
   }
 }
 
@@ -119,10 +208,23 @@ async function saveResume() {
     await api('/api/resumes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ UUID: uuid }),
+      body: JSON.stringify({
+        UUID: uuid,
+        Fio: fieldOrNull('saveFio'),
+        Birthdate: dateFieldOrNull('saveBirthdate'),
+        Sex: fieldOrNull('saveSex'),
+        City: fieldOrNull('saveCity'),
+        Telephon: fieldOrNull('saveTelephon'),
+        Citizenship: fieldOrNull('saveCitizenship'),
+        Position: fieldOrNull('savePosition'),
+        Salary: numberFieldOrNull('saveSalary'),
+        Experience: numberFieldOrNull('saveExperience'),
+      }),
     });
     showStatus('Сохранено: ' + uuid, false);
-    document.getElementById('saveUuid').value = '';
+    for (const id of ['saveUuid', 'saveFio', 'saveBirthdate', 'saveSex', 'saveCity', 'saveTelephon', 'saveCitizenship', 'savePosition', 'saveSalary', 'saveExperience']) {
+      document.getElementById(id).value = '';
+    }
     refreshList();
   } catch (e) {
     showStatus('Ошибка сохранения: ' + e.message, true);
@@ -134,8 +236,19 @@ async function getResume() {
   const resultEl = document.getElementById('getResult');
   if (!uuid) { showStatus('Введите uuid для поиска', true); return; }
   try {
-    const resume = await api('/api/resumes/' + encodeURIComponent(uuid));
-    resultEl.textContent = 'Найдено: ' + JSON.stringify(resume);
+    const r = await api('/api/resumes/' + encodeURIComponent(uuid));
+    resultEl.innerHTML = '';
+    const rows = [
+      ['UUID', r.UUID], ['ФИО', cellText(r.Fio)], ['Дата рождения', formatDate(r.Birthdate)],
+      ['Пол', cellText(r.Sex)], ['Город', cellText(r.City)], ['Телефон', cellText(r.Telephon)],
+      ['Гражданство', cellText(r.Citizenship)], ['Должность', cellText(r.Position)],
+      ['Зарплата', cellText(r.Salary)], ['Опыт', cellText(r.Experience)],
+    ];
+    for (const [label, value] of rows) {
+      const div = document.createElement('div');
+      div.textContent = label + ': ' + value;
+      resultEl.appendChild(div);
+    }
     showStatus('', false);
   } catch (e) {
     resultEl.textContent = '';
@@ -167,6 +280,7 @@ async function clearAll() {
   }
 }
 
+showTab('tab-list');
 refreshList();
 </script>
 </body>

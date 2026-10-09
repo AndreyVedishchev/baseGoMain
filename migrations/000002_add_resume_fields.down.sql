@@ -1,0 +1,10 @@
+ALTER TABLE resumes
+    DROP COLUMN fio,
+    DROP COLUMN birthdate,
+    DROP COLUMN sex,
+    DROP COLUMN city,
+    DROP COLUMN telephon,
+    DROP COLUMN citizenship,
+    DROP COLUMN position,
+    DROP COLUMN salary,
+    DROP COLUMN experience;

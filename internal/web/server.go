@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 
+	"base-go/internal/kafka"
 	"base-go/internal/models"
 	"base-go/internal/storage"
 
@@ -17,14 +18,16 @@ var staticFiles embed.FS
 
 // Server обслуживает веб-интерфейс для хранилища резюме
 type Server struct {
-	storage storage.Storage
-	log     *zap.Logger
-	mux     *http.ServeMux
+	storage  storage.Storage
+	producer *kafka.Producer
+	consumer *kafka.Consumer
+	log      *zap.Logger
+	mux      *http.ServeMux
 }
 
 // NewServer создаёт новый веб-сервер поверх переданного хранилища
-func NewServer(str storage.Storage, log *zap.Logger) *Server {
-	s := &Server{storage: str, log: log, mux: http.NewServeMux()}
+func NewServer(str storage.Storage, producer *kafka.Producer, consumer *kafka.Consumer, log *zap.Logger) *Server {
+	s := &Server{storage: str, producer: producer, consumer: consumer, log: log, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -49,6 +52,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/resumes/size", s.handleSize)
 	s.mux.HandleFunc("GET /api/resumes/{uuid}", s.handleGet)
 	s.mux.HandleFunc("DELETE /api/resumes/{uuid}", s.handleDelete)
+	s.mux.HandleFunc("GET /api/resumes/views", s.handleViews)
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, status int, v any) {
@@ -83,7 +87,18 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 		s.writeJSON(w, http.StatusNotFound, map[string]string{"error": "резюме не найдено"})
 		return
 	}
+
+	go func() {
+		if err := s.producer.Publish(resume); err != nil {
+			s.log.Error("не удалось опубликовать событие получения резюме в Kafka", zap.String("uuid", resume.UUID), zap.Error(err))
+		}
+	}()
 	s.writeJSON(w, http.StatusOK, resume)
+}
+
+// GET /api/resumes/views
+func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
+	s.writeJSON(w, http.StatusOK, s.consumer.Counts())
 }
 
 // POST /api/resumes
