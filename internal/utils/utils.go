@@ -56,3 +56,8 @@ func BuildKafkaBrokers() []string {
 func KafkaTopic() string {
 	return GetEnv("KAFKA_TOPIC", "resume-views")
 }
+
+// RedisAddr возвращает адрес Redis
+func RedisAddr() string {
+	return GetEnv("REDIS_ADDR", "localhost:6379")
+}

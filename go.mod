@@ -1,6 +1,6 @@
 module base-go
 
-go 1.25.11
+go 1.26.0
 
 require (
 	github.com/golang-migrate/migrate/v4 v4.20.1
@@ -10,6 +10,7 @@ require (
 require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
+	github.com/redis/go-redis/v9 v9.23.0
 	github.com/segmentio/kafka-go v0.4.51
 	go.uber.org/zap v1.28.0
 )
@@ -17,6 +18,7 @@ require (
 require (
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.16 // indirect
+	go.uber.org/atomic v1.12.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 )
 
@@ -28,6 +30,6 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.1 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"sort"
-	"sync"
 
 	"base-go/internal/utils"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
@@ -20,11 +19,13 @@ type ViewCount struct {
 	Count int
 }
 
+// ключ, под которым в Redis хранится sorted set со счётчиками просмотров по uuid
+const viewsKey = "resume:views"
+
 type Consumer struct {
 	reader *kafka.Reader
+	redis  *redis.Client
 	log    *zap.Logger
-	mu     sync.Mutex
-	counts map[string]int
 }
 
 func NewConsumer(log *zap.Logger) *Consumer {
@@ -33,10 +34,11 @@ func NewConsumer(log *zap.Logger) *Consumer {
 		Topic:       utils.KafkaTopic(),
 		StartOffset: kafka.FirstOffset,
 	})
-	return &Consumer{reader: reader, log: log, counts: make(map[string]int)}
+	rdb := redis.NewClient(&redis.Options{Addr: utils.RedisAddr()})
+	return &Consumer{reader: reader, redis: rdb, log: log}
 }
 
-// Run Читает сообщения из topic и увеличивает счётчик по uuid
+// Run читает сообщения из topic и увеличивает счётчик по uuid в Redis
 func (c *Consumer) Run() {
 	for {
 		msg, err := c.reader.ReadMessage(context.Background())
@@ -54,28 +56,29 @@ func (c *Consumer) Run() {
 			continue
 		}
 
-		c.mu.Lock()
-		c.counts[event.UUID]++
-		c.mu.Unlock()
+		if err := c.redis.ZIncrBy(context.Background(), viewsKey, 1, event.UUID).Err(); err != nil {
+			c.log.Error("ошибка увеличения счётчика в Redis", zap.Error(err))
+		}
 	}
 }
 
-// Counts возвращает текущие счётчики, отсортированные по убыванию количества
+// Counts возвращает счётчики, отсортированные по убыванию количества
 func (c *Consumer) Counts() []ViewCount {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	result := make([]ViewCount, 0, len(c.counts))
-	for uuid, count := range c.counts {
-		result = append(result, ViewCount{UUID: uuid, Count: count})
+	rows, err := c.redis.ZRevRangeWithScores(context.Background(), viewsKey, 0, -1).Result()
+	if err != nil {
+		c.log.Error("ошибка чтения счётчиков из Redis", zap.Error(err))
+		return nil
 	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Count > result[j].Count
-	})
+
+	result := make([]ViewCount, 0, len(rows))
+	for _, z := range rows {
+		result = append(result, ViewCount{UUID: z.Member.(string), Count: int(z.Score)})
+	}
 	return result
 }
 
-// Close закрывает консьюмер
+// Close закрывает консьюмер и подключение к Redis
 func (c *Consumer) Close() error {
+	c.redis.Close()
 	return c.reader.Close()
 }
